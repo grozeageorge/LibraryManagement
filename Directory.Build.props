@@ -1,0 +1,18 @@
+<Project>
+	<PropertyGroup>
+		<!-- Force .NET 10 for all projects -->
+		<TargetFramework>net10.0</TargetFramework>
+
+		<!-- Enable XML Documentation for everyone (Fixes SA0001) -->
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+
+		<!-- Modern C# features -->
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>disable</Nullable>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<!-- Automatically link stylecop.json to every project as an Analyzer file -->
+		<AdditionalFiles Include="$(MSBuildThisFileDirectory)stylecop.json" Link="stylecop.json" />
+	</ItemGroup>
+</Project>
