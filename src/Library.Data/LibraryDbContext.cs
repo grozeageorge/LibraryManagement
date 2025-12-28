@@ -124,6 +124,18 @@ namespace Library.Data
                 .HasOne(l => l.BookCopy)
                 .WithMany() // BookCopy doesn't explicityle list its loans in the entity
                 .HasForeignKey(l => l.BookCopyId);
+
+            modelBuilder.Entity<Loan>()
+                .HasOne(l => l.Reader)
+                .WithMany(r => r.Loans) // Loans borrowed by the reader
+                .HasForeignKey(l => l.ReaderId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Loan>()
+                .HasOne(l => l.Librarian)
+                .WithMany(r => r.ProcessedLoans)
+                .HasForeignKey(l => l.LibrarianId)
+                .OnDelete(DeleteBehavior.Restrict);
         }
     }
 }

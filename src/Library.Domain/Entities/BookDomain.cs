@@ -58,7 +58,7 @@ namespace Library.Domain.Entities
         /// <returns>
         ///   <c>true</c> if is ancestor of the specified domain; otherwise, <c>false</c>.
         /// </returns>
-        public bool IsAncestorOf(BookDomain domain)
+        public bool IsAncestorOf(BookDomain? domain)
         {
             if (domain == null)
             {

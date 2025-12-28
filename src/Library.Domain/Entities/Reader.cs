@@ -40,7 +40,7 @@ namespace Library.Domain.Entities
         /// <value>
         /// The email.
         /// </value>
-        required public string Email { get; set; }
+        public string? Email { get; set; }
 
         /// <summary>
         /// Gets or sets the phone number.
@@ -48,7 +48,7 @@ namespace Library.Domain.Entities
         /// <value>
         /// The phone number.
         /// </value>
-        required public string PhoneNumber { get; set; }
+        public string? PhoneNumber { get; set; }
 
         /// <summary>
         /// Gets or sets the type of the reader.
@@ -73,5 +73,13 @@ namespace Library.Domain.Entities
         ///   <c>true</c> if this instance is librarian; otherwise, <c>false</c>.
         /// </returns>
         public bool IsLibrarian => this.Type == ReaderType.Librarian;
+
+        /// <summary>
+        /// Gets or sets the processed or issued loans by this librarian.
+        /// </summary>
+        /// <value>
+        /// The processed loans.
+        /// </value>
+        public virtual ICollection<Loan> ProcessedLoans { get; set; } = new List<Loan>();
     }
 }

@@ -4,6 +4,8 @@
 
 namespace Library.Domain.Entities
 {
+    using Library.Domain.Interfaces;
+
     /// <summary>
     /// The book entity that represents a book in the library system.
     /// Manages authors, domains and editions.
@@ -47,13 +49,20 @@ namespace Library.Domain.Entities
         /// Adds a new domain.
         /// </summary>
         /// <param name="domain">The domain to be added.</param>
-        /// <param name="maxDomainsAllowed">The maximum domains allowed.</param>
-        public void AddDomain(BookDomain domain, int maxDomainsAllowed)
+        /// <param name="config">The maximum domains allowed.</param>
+        public void AddDomain(BookDomain? domain, ILibraryConfiguration config)
         {
             if (domain == null)
             {
                 throw new ArgumentNullException(nameof(domain));
             }
+
+            if (config == null)
+            {
+                throw new ArgumentNullException(nameof(config));
+            }
+
+            int maxDomainsAllowed = config.MaxDomainsPerBook;
 
             if (this.Domains.Count >= maxDomainsAllowed)
             {

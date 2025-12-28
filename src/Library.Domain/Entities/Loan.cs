@@ -73,5 +73,21 @@ namespace Library.Domain.Entities
         /// The extension days count.
         /// </value>
         public int ExtensionDaysCount { get; set; } = 0;
+
+        /// <summary>
+        /// Gets or sets the librarian identifier.
+        /// </summary>
+        /// <value>
+        /// The librarian identifier.
+        /// </value>
+        public Guid? LibrarianId { get; set; }
+
+        /// <summary>
+        /// Gets or sets the librarian.
+        /// </summary>
+        /// <value>
+        /// The librarian.
+        /// </value>
+        public virtual Reader? Librarian { get; set; }
     }
 }

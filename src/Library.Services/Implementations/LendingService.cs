@@ -53,19 +53,16 @@ namespace Library.Services.Implementations
         /// </summary>
         /// <param name="readerId">The reader identifier.</param>
         /// <param name="bookCopyId">The book copy identifier.</param>
-        /// <exception cref="ArgumentException">
-        /// Reader not found.
+        /// <param name="librarianId">The librarian identifier.</param>
+        /// <exception cref="ArgumentException">Reader not found.
         /// or
-        /// Book copy not found.
-        /// </exception>
-        /// <exception cref="InvalidOperationException">
-        /// Book hierarchy is incomplete (missing Edition or Book).
+        /// Book copy not found.</exception>
+        /// <exception cref="InvalidOperationException">Book hierarchy is incomplete (missing Edition or Book).
         /// or
         /// This book copy is already borrowed.
         /// or
-        /// This copy is restricted to the reading room.
-        /// </exception>
-        public void BorrowBook(Guid readerId, Guid bookCopyId)
+        /// This copy is restricted to the reading room.</exception>
+        public void BorrowBook(Guid readerId, Guid bookCopyId, Guid? librarianId = null)
         {
             this.logger.LogInformation($"Starting borrow process for reader {readerId} and book copy {bookCopyId}");
 
@@ -100,6 +97,11 @@ namespace Library.Services.Implementations
             this.ValidateDomainHistory(reader, book); // Check domain history (D in L months)
 
             this.ValidateReborrowDelta(reader, copy); // Check re-borrow delta
+
+            if (librarianId.HasValue)
+            {
+                this.ValidateLibrarianLimit(librarianId.Value);
+            }
 
             Loan loan = new Loan
             {
@@ -153,6 +155,150 @@ namespace Library.Services.Implementations
             this.logger.LogInformation("Book returned successfully.");
         }
 
+        /// <summary>
+        /// Extends the due date of an active loan.
+        /// </summary>
+        /// <param name="loanId">The loan identifier.</param>
+        /// <param name="days">The number of days to extend.</param>
+        /// <exception cref="ArgumentException">
+        /// Extension days must be positive.
+        /// or
+        /// Loan not found.
+        /// </exception>
+        /// <exception cref="InvalidOperationException">
+        /// Cannot extend a returned book.
+        /// or
+        /// Reader associated with loan not found.
+        /// or
+        /// Cannot extend. Total extension days would exceed the limit of {limit}. Current: {loan.ExtensionDaysCount}.
+        /// </exception>
+        public void ExtendLoan(Guid loanId, int days)
+        {
+            this.logger.LogInformation($"Attempting to extend loan {loanId} by {days} days.");
+
+            if (days <= 0)
+            {
+                throw new ArgumentException("Extension days must be positive.");
+            }
+
+            Loan loan = this.loanRepository.GetById(loanId)
+                        ?? throw new ArgumentException("Loan not found.");
+
+            if (loan.ReturnDate != null)
+            {
+                throw new InvalidOperationException("Cannot extend a returned book.");
+            }
+
+            // Load Reader to check if librarian
+            // If lazy loading is off, we might need to fetch reader explicitly.
+            // We assume generic repo getbyid doesn't include navigation properties by default unless configured.
+            // Fetching the reader to be safe.
+            Reader? reader = this.readerRepository.GetById(loan.ReaderId);
+            if (reader == null)
+            {
+                throw new InvalidOperationException("Reader associated with loan not found.");
+            }
+
+            int limit = this.config.MaxExtensionDays;
+            if (reader.IsLibrarian)
+            {
+                limit *= 2;
+            }
+
+            // Check constraint, sum < limit
+            if (loan.ExtensionDaysCount + days > limit)
+            {
+                throw new InvalidOperationException($"Cannot extend. Total extension days would exceed the limit of {limit}. Current: {loan.ExtensionDaysCount}.");
+            }
+
+            // Apply extension
+            loan.DueDate = loan.DueDate.AddDays(days);
+            loan.ExtensionDaysCount += days;
+
+            this.loanRepository.SaveChanges();
+            this.logger.LogInformation($"Loan extended successfully. New DueDate: {loan.DueDate}.");
+        }
+
+        /// <summary>
+        /// Borrows multiple books in a single transaction. Enforces the "3 books must be from 2 categories" rule.
+        /// </summary>
+        /// <param name="readerId">The reader identifier.</param>
+        /// <param name="bookCopyIds">List of book copy ids.</param>
+        /// <exception cref="ArgumentException">
+        /// Must select at least one book.
+        /// or
+        /// Reader not found.
+        /// or
+        /// Book copy {copyId} not found.
+        /// </exception>
+        /// <exception cref="InvalidOperationException">
+        /// Cannot borrow more than {limit} books at once.
+        /// or
+        /// Book data incomplete.
+        /// or
+        /// When borrowing 3 or more books, they must come from at least 2 distinct categories.
+        /// </exception>
+        public void BorrowBooks(Guid readerId, IEnumerable<Guid> bookCopyIds)
+        {
+            List<Guid> copyIdList = bookCopyIds.ToList();
+
+            if (!copyIdList.Any())
+            {
+                throw new ArgumentException("Must select at least one book.");
+            }
+
+            // Check Limit C (Max books per loan)
+            Reader reader = this.readerRepository.GetById(readerId)
+                            ?? throw new ArgumentException("Reader not found.");
+
+            int limit = this.config.MaxBooksPerLoan;
+            if (reader.IsLibrarian)
+            {
+                limit *= 2;
+            }
+
+            if (copyIdList.Count > limit)
+            {
+                throw new InvalidOperationException($"Cannot borrow more than {limit} books at once.");
+            }
+
+            // Check 3 books -> 2 categories rule
+            if (copyIdList.Count >= 3)
+            {
+                HashSet<Guid> distinctDomainIds = new HashSet<Guid>();
+
+                foreach (Guid copyId in copyIdList)
+                {
+                    BookCopy copy = this.copyRepository.GetById(copyId)
+                                    ?? throw new ArgumentException($"Book copy {copyId} not found.");
+
+                    // Ensure hierarchy is loaded
+                    if (copy.BookEdition?.Book == null)
+                    {
+                        // Try to load book if missing (simplified in real app use .Include()
+                        throw new InvalidOperationException("Book data incomplete.");
+                    }
+
+                    foreach (BookDomain domain in copy.BookEdition.Book.Domains)
+                    {
+                        distinctDomainIds.Add(domain.Id);
+                    }
+                }
+
+                if (distinctDomainIds.Count < 2)
+                {
+                    throw new InvalidOperationException("When borrowing 3 or more books, they must come from at least 2 distinct categories.");
+                }
+            }
+
+            // Process loans
+            // borrow one by one , other rules woulde be checked in the method borrowbook
+            foreach (Guid copyId in copyIdList)
+            {
+                this.BorrowBook(readerId, copyId);
+            }
+        }
+
         private void ValidateStockRule(Guid bookId)
         {
             List<BookCopy>? allCopies = this.copyRepository.Find(c => c.BookEdition != null && c.BookEdition.BookId == bookId).ToList();
@@ -172,7 +318,7 @@ namespace Library.Services.Implementations
                 throw new InvalidOperationException("All copies of this book are for the reading room.");
             }
 
-            double percentage = availableCirculating / totalCopies * 100.0;
+            double percentage = (double)availableCirculating / totalCopies * 100.0;
 
             if (percentage < 10.0)
             {
@@ -278,6 +424,29 @@ namespace Library.Services.Implementations
                 {
                     throw new InvalidOperationException($"Cannot re-borrow this book so soon. Must wait {deltaDays} days.");
                 }
+            }
+        }
+
+        private void ValidateLibrarianLimit(Guid librarianId)
+        {
+            Reader librarian = this.readerRepository.GetById(librarianId)
+                ?? throw new ArgumentException("Librarian not found.");
+
+            if (!librarian.IsLibrarian)
+            {
+                throw new InvalidOperationException("The specified ID does not belong to a Librarian.");
+            }
+
+            int limit = this.config.MaxProcessedPerDayLibrarian;
+            DateTime today = DateTime.Today;
+
+            int processedToday = this.loanRepository.Find(l =>
+                l.LibrarianId == librarianId &&
+                l.LoanDate.Date == today).Count();
+
+            if (processedToday >= limit)
+            {
+                throw new InvalidOperationException($"Librarian has reached the daily processing limit ({limit}).");
             }
         }
     }
