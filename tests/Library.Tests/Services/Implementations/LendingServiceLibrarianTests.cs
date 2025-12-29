@@ -10,6 +10,7 @@ namespace Library.Tests.Services.Implementations
     using Library.Domain.Interfaces;
     using Library.Domain.Repositories;
     using Library.Services.Implementations;
+    using Library.Tests.Helpers;
     using Microsoft.Extensions.Logging;
     using Moq;
 
@@ -56,50 +57,26 @@ namespace Library.Tests.Services.Implementations
         public void BorrowBook_ShouldThrow_WhenLibrarianExceedsDailyProcessingLimit()
         {
             // Arrange
-            Guid readerId = Guid.NewGuid();
-            Guid librarianId = Guid.NewGuid();
-            Guid copyId = Guid.NewGuid();
+            Reader reader = LibraryTestFactory.CreateReader(ReaderType.Standard);
+            Reader librarian = LibraryTestFactory.CreateReader(ReaderType.Librarian);
+            BookCopy targetCopy = LibraryTestFactory.CreateCopy();
 
-            BookCopy targetCopy = new BookCopy
-            {
-                Id = copyId,
-                IsAvailable = true,
-                BookEdition = new BookEdition
-                {
-                    Book = new Book { Title = "Sample Book" },
-                    BookType = "H",
-                    Publisher = "P",
-                },
-            };
-
-            this.mockConfig.Setup(c => c.MaxProcessedPerDayLibrarian).Returns(20);
-            this.mockConfig.Setup(c => c.MaxBooksPerReader).Returns(100);
-            this.mockConfig.Setup(c => c.MaxBooksPerDay).Returns(100);
-            this.mockConfig.Setup(c => c.MaxBooksPerDomain).Returns(100);
-            this.mockConfig.Setup(c => c.DomainCheckIntervalMonths).Returns(1);
+            this.mockConfig.SetupConfigDefaultLimits(maxProcessedPerDayLibrarian: 20);
 
             List<Loan> processedLoans = new List<Loan>();
             for (int i = 0; i < 20; i++)
             {
-                processedLoans.Add(new Loan
-                {
-                    LibrarianId = librarianId,
-                    LoanDate = DateTime.Today,
-                });
+                processedLoans.Add(LibraryTestFactory.CreateLoan(librarian: librarian, loanDate: DateTime.Today));
             }
 
-            this.mockReaderRepo.Setup(r => r.GetById(readerId)).Returns(new Reader { Type = ReaderType.Standard, Address = "C", FirstName = "A", LastName = "B", Email = "a@a.com" });
-            this.mockReaderRepo.Setup(r => r.GetById(librarianId)).Returns(new Reader { Type = ReaderType.Librarian, Address = "C", FirstName = "L", LastName = "M", Email = "b@b.com" });
-
-            this.mockCopyRepo.Setup(c => c.GetById(copyId)).Returns(targetCopy);
-            this.mockCopyRepo.Setup(c => c.Find(It.IsAny<Expression<Func<BookCopy, bool>>>()))
-                .Returns(new List<BookCopy> { targetCopy });
-
-            this.mockLoanRepo.Setup(l => l.Find(It.IsAny<Expression<Func<Loan, bool>>>()))
-                .Returns(processedLoans);
+            this.mockReaderRepo.SetupGetById(reader.Id, reader);
+            this.mockReaderRepo.SetupGetById(librarian.Id, librarian);
+            this.mockCopyRepo.SetupGetById(targetCopy.Id, targetCopy);
+            this.mockCopyRepo.SetupFind(new List<BookCopy> { targetCopy });
+            this.mockLoanRepo.SetupFind(processedLoans);
 
             // Act
-            Action act = () => this.service.BorrowBook(readerId, copyId, librarianId);
+            Action act = () => this.service.BorrowBook(reader.Id, targetCopy.Id, librarian.Id);
 
             // Assert
             act.Should().Throw<InvalidOperationException>()
@@ -113,50 +90,26 @@ namespace Library.Tests.Services.Implementations
         public void BorrowBook_ShouldPass_WhenLibrarianIsUnderLimit()
         {
             // Arrange
-            Guid readerId = Guid.NewGuid();
-            Guid librarianId = Guid.NewGuid();
-            Guid copyId = Guid.NewGuid();
+            Reader reader = LibraryTestFactory.CreateReader(ReaderType.Standard);
+            Reader librarian = LibraryTestFactory.CreateReader(ReaderType.Librarian);
+            BookCopy targetCopy = LibraryTestFactory.CreateCopy();
 
-            BookCopy targetCopy = new BookCopy
-            {
-                Id = copyId,
-                IsAvailable = true,
-                BookEdition = new BookEdition
-                {
-                    Book = new Book { Title = "Sample Book" },
-                    BookType = "H",
-                    Publisher = "P",
-                },
-            };
-
-            this.mockConfig.Setup(c => c.MaxProcessedPerDayLibrarian).Returns(20);
-            this.mockConfig.Setup(c => c.MaxBooksPerReader).Returns(100);
-            this.mockConfig.Setup(c => c.MaxBooksPerDay).Returns(100);
-            this.mockConfig.Setup(c => c.MaxBooksPerDomain).Returns(100);
-            this.mockConfig.Setup(c => c.DomainCheckIntervalMonths).Returns(1);
+            this.mockConfig.SetupConfigDefaultLimits(maxProcessedPerDayLibrarian: 20);
 
             List<Loan> processedLoans = new List<Loan>();
             for (int i = 0; i < 19; i++)
             {
-                processedLoans.Add(new Loan
-                {
-                    LibrarianId = librarianId,
-                    LoanDate = DateTime.Today,
-                });
+                processedLoans.Add(LibraryTestFactory.CreateLoan(librarian: librarian, loanDate: DateTime.Today));
             }
 
-            this.mockReaderRepo.Setup(r => r.GetById(readerId)).Returns(new Reader { Type = ReaderType.Standard, Address = "C", FirstName = "A", LastName = "B", Email = "a@a.com" });
-            this.mockReaderRepo.Setup(r => r.GetById(librarianId)).Returns(new Reader { Type = ReaderType.Librarian, Address = "C", FirstName = "L", LastName = "M", Email = "b@b.com" });
-
-            this.mockCopyRepo.Setup(c => c.GetById(copyId)).Returns(targetCopy);
-            this.mockCopyRepo.Setup(c => c.Find(It.IsAny<Expression<Func<BookCopy, bool>>>()))
-                .Returns(new List<BookCopy> { targetCopy });
-
-            this.mockLoanRepo.Setup(l => l.Find(It.IsAny<Expression<Func<Loan, bool>>>()))
-                .Returns(processedLoans);
+            this.mockReaderRepo.SetupGetById(reader.Id, reader);
+            this.mockReaderRepo.SetupGetById(librarian.Id, librarian);
+            this.mockCopyRepo.SetupGetById(targetCopy.Id, targetCopy);
+            this.mockCopyRepo.SetupFind(new List<BookCopy> { targetCopy });
+            this.mockLoanRepo.SetupFind(processedLoans);
 
             // Act
-            Action act = () => this.service.BorrowBook(readerId, copyId, librarianId);
+            Action act = () => this.service.BorrowBook(reader.Id, targetCopy.Id, librarian.Id);
 
             // Assert
             act.Should().NotThrow();

@@ -10,6 +10,7 @@ namespace Library.Tests.Services.Implementations
     using Library.Domain.Interfaces;
     using Library.Domain.Repositories;
     using Library.Services.Implementations;
+    using Library.Tests.Helpers;
     using Microsoft.Extensions.Logging;
     using Moq;
 
@@ -67,51 +68,31 @@ namespace Library.Tests.Services.Implementations
         public void BorrowBook_DomainHistory(ReaderType type, int limitD, int currentCount, bool shouldSucceed)
         {
             // Arrange
-            Guid readerId = Guid.NewGuid();
-            Guid copyId = Guid.NewGuid();
-            Guid domainId = Guid.NewGuid();
+            Reader reader = LibraryTestFactory.CreateReader(type: type);
+            BookDomain domain = LibraryTestFactory.CreateDomain(name: "Science Fiction");
+            Book targetBook = LibraryTestFactory.CreateBook(title: "Dune", domain: domain);
+            BookEdition targetEdition = LibraryTestFactory.CreateEdition(book: targetBook);
+            BookCopy targetCopy = LibraryTestFactory.CreateCopy(edition: targetEdition, isAvailable: true);
 
-            BookDomain domain = new BookDomain { Id = domainId, Name = "Science Fiction" };
-
-            Book targetBook = new Book { Title = "Dune" };
-            targetBook.Domains.Add(domain); // Bypass AddDomain for simplicity (no config needed)
-            BookEdition targetEdition = new BookEdition { Book = targetBook, BookType = "Hardcover", Publisher = "P" };
-            BookCopy targetCopy = new BookCopy { Id = copyId, BookEdition = targetEdition, IsAvailable = true };
-
-            this.mockConfig.Setup(c => c.MaxBooksPerDomain).Returns(limitD);
-            this.mockConfig.Setup(c => c.DomainCheckIntervalMonths).Returns(6);
-            this.mockConfig.Setup(c => c.MaxBooksPerReader).Returns(100);
-            this.mockConfig.Setup(c => c.MaxBooksPerDay).Returns(100);
-            this.mockConfig.Setup(c => c.ReborrowRestrictedDays).Returns(0);
+            this.mockConfig.SetupConfigDefaultLimits(maxBooksPerDomain: limitD, domainCheckIntervalMonths: 6);
 
             // Setup history (Existing loans)
             List<Loan> loans = new List<Loan>();
             for (int i = 0; i < currentCount; i++)
             {
-                Book oldBook = new Book { Title = $"Old Book {i + 1}" };
-                oldBook.Domains.Add(domain); // Bypass AddDomain for simplicity
-                BookEdition oldEdition = new BookEdition { Book = oldBook, BookType = "Paperback", Publisher = "P" };
-                BookCopy oldCopy = new BookCopy { BookEdition = oldEdition };
-
-                loans.Add(new Loan
-                {
-                    ReaderId = readerId,
-                    LoanDate = DateTime.Now.AddMonths(-1),
-                    BookCopy = oldCopy,
-                });
+                Book oldBook = LibraryTestFactory.CreateBook(title: $"Old Book {i + 1}", domain: domain);
+                BookEdition oldEdition = LibraryTestFactory.CreateEdition(book: oldBook);
+                BookCopy oldCopy = LibraryTestFactory.CreateCopy(edition: oldEdition, isAvailable: false);
+                loans.Add(LibraryTestFactory.CreateLoan(readerId: reader.Id, copy: oldCopy, loanDate: DateTime.Now.AddMonths(-1)));
             }
 
-            this.mockReaderRepo.Setup(r => r.GetById(readerId)).Returns(new Reader { Id = readerId, Type = type, FirstName = "John", LastName = "Doe", Address = "123 Main St.", Email = "a@a.com" });
-            this.mockCopyRepo.Setup(c => c.GetById(copyId)).Returns(targetCopy);
-
-            this.mockCopyRepo.Setup(c => c.Find(It.IsAny<Expression<Func<BookCopy, bool>>>()))
-                .Returns(new List<BookCopy> { targetCopy });
-
-            this.mockLoanRepo.Setup(l => l.Find(It.IsAny<Expression<Func<Loan, bool>>>()))
-                .Returns(loans);
+            this.mockReaderRepo.SetupGetById(reader.Id, reader);
+            this.mockCopyRepo.SetupGetById(targetCopy.Id, targetCopy);
+            this.mockCopyRepo.SetupFind(new List<BookCopy> { targetCopy });
+            this.mockLoanRepo.SetupFind(loans);
 
             // Act
-            Action act = () => this.service.BorrowBook(readerId, copyId);
+            Action act = () => this.service.BorrowBook(reader.Id, targetCopy.Id);
 
             // Assert
             if (shouldSucceed)
@@ -132,37 +113,21 @@ namespace Library.Tests.Services.Implementations
         public void BorrowBook_DomainHistory_ShouldIgnoreOldLoans()
         {
             // Arrange
-            Guid readerId = Guid.NewGuid();
-            Guid copyId = Guid.NewGuid();
+            Reader reader = LibraryTestFactory.CreateReader();
+            BookDomain domain = LibraryTestFactory.CreateDomain(name: "History");
+            Book targetBook = LibraryTestFactory.CreateBook(title: "World History", domain: domain);
+            BookEdition targetEdition = LibraryTestFactory.CreateEdition(book: targetBook);
+            BookCopy targetCopy = LibraryTestFactory.CreateCopy(edition: targetEdition, isAvailable: true);
 
-            BookDomain domain = new BookDomain { Name = "History" };
-            Book targetBook = new Book { Title = "World History" };
-            targetBook.Domains.Add(domain); // Bypass AddDomain for simplicity (no config needed)
-            BookCopy targetCopy = new BookCopy { Id = copyId, BookEdition = new BookEdition { Book = targetBook, BookType = "Hardcover", Publisher = "P" }, IsAvailable = true };
-
-            this.mockConfig.Setup(c => c.MaxBooksPerDomain).Returns(2);
-            this.mockConfig.Setup(c => c.DomainCheckIntervalMonths).Returns(3);
-            this.mockConfig.Setup(c => c.MaxBooksPerReader).Returns(100);
-            this.mockConfig.Setup(c => c.MaxBooksPerDay).Returns(100);
+            this.mockConfig.SetupConfigDefaultLimits(maxBooksPerDomain: 2, domainCheckIntervalMonths: 3);
 
             List<Loan> loans = new List<Loan>(); // History: 2 loans (limit reached), but one is 5 months old (outside window)
 
-            Book b1 = new Book { Title = "B1" }; // Loan 1 should count because it is recent
-            b1.Domains.Add(domain);
-            loans.Add(new Loan
-            {
-                ReaderId = readerId,
-                LoanDate = DateTime.Now.AddMonths(-1),
-                BookCopy = new BookCopy
-                {
-                    BookEdition = new BookEdition
-                    {
-                        Book = b1,
-                        BookType = "Hardcover",
-                        Publisher = "P",
-                    },
-                },
-            });
+            Book b1 = LibraryTestFactory.CreateBook(title: "B1", domain: domain);
+            loans.Add(LibraryTestFactory.CreateLoan(
+                readerId: reader.Id,
+                copy: LibraryTestFactory.CreateCopy(edition: LibraryTestFactory.CreateEdition(book: b1)),
+                loanDate: DateTime.Now.AddMonths(-1))); // Recent
 
             // Loan 2: Old (Should NOT count)
             // Note: In the real service, the Repository.Find filters by date.
@@ -175,17 +140,13 @@ namespace Library.Tests.Services.Implementations
             // We will return ONLY the recent loan.
             List<Loan> recentLoans = new List<Loan> { loans[0] };
 
-            this.mockReaderRepo.Setup(r => r.GetById(readerId)).Returns(new Reader { Type = ReaderType.Standard, FirstName = "John", LastName = "Doe", Address = "123 Main St.", Email = "a@a.com" });
-            this.mockCopyRepo.Setup(c => c.GetById(copyId)).Returns(targetCopy);
-
-            this.mockCopyRepo.Setup(c => c.Find(It.IsAny<Expression<Func<BookCopy, bool>>>()))
-                .Returns(new List<BookCopy> { targetCopy });
-
-            this.mockLoanRepo.Setup(l => l.Find(It.IsAny<Expression<Func<Loan, bool>>>()))
-                .Returns(recentLoans); // Return only 1 valid loan
+            this.mockReaderRepo.SetupGetById(reader.Id, reader);
+            this.mockCopyRepo.SetupGetById(targetCopy.Id, targetCopy);
+            this.mockCopyRepo.SetupFind(new List<BookCopy> { targetCopy });
+            this.mockLoanRepo.SetupFind(recentLoans);
 
             // Act
-            Action act = () => this.service.BorrowBook(readerId, copyId);
+            Action act = () => this.service.BorrowBook(reader.Id, targetCopy.Id);
 
             // Assert
             act.Should().NotThrow(); // Should pass because count is 1, limit is 2

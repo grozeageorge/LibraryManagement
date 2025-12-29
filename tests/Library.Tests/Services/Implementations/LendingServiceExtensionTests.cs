@@ -9,6 +9,7 @@ namespace Library.Tests.Services.Implementations
     using Library.Domain.Interfaces;
     using Library.Domain.Repositories;
     using Library.Services.Implementations;
+    using Library.Tests.Helpers;
     using Microsoft.Extensions.Logging;
     using Moq;
 
@@ -89,13 +90,12 @@ namespace Library.Tests.Services.Implementations
         public void ExtendLoan_ShouldThrow_WhenBookAlreadyReturned()
         {
             // Arrange
-            Guid loanId = Guid.NewGuid();
-            Loan loan = new Loan { Id = loanId, ReturnDate = DateTime.Now }; // Returned
+            Loan loan = LibraryTestFactory.CreateLoan(returnDate: DateTime.Now);
 
-            this.mockLoanRepo.Setup(l => l.GetById(loanId)).Returns(loan);
+            this.mockLoanRepo.SetupGetById(loan.Id, loan);
 
             // Act
-            Action act = () => this.service.ExtendLoan(loanId, 5);
+            Action act = () => this.service.ExtendLoan(loan.Id, 5);
 
             // Assert
             act.Should().Throw<InvalidOperationException>()
@@ -109,27 +109,17 @@ namespace Library.Tests.Services.Implementations
         public void ExtendLoan_ShouldUpdateDueDate_WhenValid()
         {
             // Arrange
-            Guid loanId = Guid.NewGuid();
-            Guid readerId = Guid.NewGuid();
+            Reader reader = LibraryTestFactory.CreateReader();
+            Loan loan = LibraryTestFactory.CreateLoan(readerId: reader.Id);
             DateTime initialDueDate = DateTime.Now.AddDays(10);
+            loan.DueDate = initialDueDate;
 
-            Loan loan = new Loan
-            {
-                Id = loanId,
-                ReaderId = readerId,
-                DueDate = initialDueDate,
-                ExtensionDaysCount = 0,
-                ReturnDate = null,
-            };
-
-            Reader reader = new Reader { Id = readerId, Type = ReaderType.Standard, FirstName = "A", LastName = "B", Address = "C", Email = "a@a.com" };
-
-            this.mockLoanRepo.Setup(l => l.GetById(loanId)).Returns(loan);
-            this.mockReaderRepo.Setup(r => r.GetById(readerId)).Returns(reader);
-            this.mockConfig.Setup(c => c.MaxExtensionDays).Returns(30);
+            this.mockLoanRepo.SetupGetById(loan.Id, loan);
+            this.mockReaderRepo.SetupGetById(reader.Id, reader);
+            this.mockConfig.SetupConfigDefaultLimits(maxExtensionDays: 30);
 
             // Act
-            this.service.ExtendLoan(loanId, 10);
+            this.service.ExtendLoan(loan.Id, 10);
 
             // Assert
             loan.ExtensionDaysCount.Should().Be(10);
@@ -152,26 +142,17 @@ namespace Library.Tests.Services.Implementations
         public void ExtendLoan_LimitCheck_Boundaries(ReaderType type, int configLimit, int currentExtensions, int newExtensions, bool shouldSucceed)
         {
             // Arrange
-            Guid loanId = Guid.NewGuid();
-            Guid readerId = Guid.NewGuid();
+            Reader reader = LibraryTestFactory.CreateReader(type: type);
+            Loan loan = LibraryTestFactory.CreateLoan(readerId: reader.Id);
+            loan.ExtensionDaysCount = currentExtensions;
+            loan.DueDate = DateTime.Now;
 
-            Loan loan = new Loan
-            {
-                Id = loanId,
-                ReaderId = readerId,
-                ExtensionDaysCount = currentExtensions,
-                ReturnDate = null,
-                DueDate = DateTime.Now,
-            };
-
-            Reader reader = new Reader { Id = readerId, Type = type, FirstName = "A", LastName = "B", Address = "C", Email = "a@a.com" };
-
-            this.mockLoanRepo.Setup(l => l.GetById(loanId)).Returns(loan);
-            this.mockReaderRepo.Setup(r => r.GetById(readerId)).Returns(reader);
-            this.mockConfig.Setup(c => c.MaxExtensionDays).Returns(configLimit);
+            this.mockLoanRepo.SetupGetById(loan.Id, loan);
+            this.mockReaderRepo.SetupGetById(reader.Id, reader);
+            this.mockConfig.SetupConfigDefaultLimits(maxExtensionDays: configLimit);
 
             // Act
-            Action act = () => this.service.ExtendLoan(loanId, newExtensions);
+            Action act = () => this.service.ExtendLoan(loan.Id, newExtensions);
 
             // Assert
             if (shouldSucceed)

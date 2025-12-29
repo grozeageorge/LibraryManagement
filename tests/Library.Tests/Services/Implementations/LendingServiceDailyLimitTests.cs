@@ -10,6 +10,7 @@ namespace Library.Tests.Services.Implementations
     using Library.Domain.Interfaces;
     using Library.Domain.Repositories;
     using Library.Services.Implementations;
+    using Library.Tests.Helpers;
     using Microsoft.Extensions.Logging;
     using Moq;
 
@@ -62,45 +63,25 @@ namespace Library.Tests.Services.Implementations
         public void BorrowBook_DailyLimit_StandardReader(int limitNCZ, int borrowedToday, bool shouldSucceed)
         {
             // Arrange
-            Guid readerId = Guid.NewGuid();
-            Guid copyId = Guid.NewGuid();
+            Reader reader = LibraryTestFactory.CreateReader();
+            BookCopy targetCopy = LibraryTestFactory.CreateCopy();
 
-            BookCopy targetCopy = new BookCopy
-            {
-                Id = copyId,
-                IsAvailable = true,
-                BookEdition = new BookEdition
-                {
-                    Book = new Book { Title = "T" },
-                    BookType = "Hardcover",
-                    Publisher = "P",
-                },
-            };
-
-            this.mockConfig.Setup(c => c.MaxBooksPerDay).Returns(limitNCZ);
-            this.mockConfig.Setup(c => c.MaxBooksPerReader).Returns(100);
-            this.mockConfig.Setup(c => c.MaxBooksPerDomain).Returns(100);
-            this.mockConfig.Setup(c => c.DomainCheckIntervalMonths).Returns(1);
-            this.mockConfig.Setup(c => c.ReborrowRestrictedDays).Returns(0);
+            this.mockConfig.SetupConfigDefaultLimits(maxBooksPerDay: limitNCZ);
 
             // History: Loans from Today
             List<Loan> loans = new List<Loan>();
             for (int i = 0; i < borrowedToday; i++)
             {
-                loans.Add(new Loan { ReaderId = readerId, LoanDate = DateTime.Today });
+                loans.Add(LibraryTestFactory.CreateLoan(readerId: reader.Id, loanDate: DateTime.Today));
             }
 
-            this.mockReaderRepo.Setup(r => r.GetById(readerId)).Returns(new Reader { Type = ReaderType.Standard, FirstName = "John", LastName = "Doe", Address = "123 Main St.", Email = "a@a.com" });
-            this.mockCopyRepo.Setup(c => c.GetById(copyId)).Returns(targetCopy);
-
-            this.mockCopyRepo.Setup(c => c.Find(It.IsAny<Expression<Func<BookCopy, bool>>>()))
-                .Returns(new List<BookCopy> { targetCopy });
-
-            this.mockLoanRepo.Setup(l => l.Find(It.IsAny<Expression<Func<Loan, bool>>>()))
-                .Returns(loans);
+            this.mockReaderRepo.SetupGetById(reader.Id, reader);
+            this.mockCopyRepo.SetupGetById(targetCopy.Id, targetCopy);
+            this.mockCopyRepo.SetupFind(new List<BookCopy> { targetCopy });
+            this.mockLoanRepo.SetupFind(loans);
 
             // Act
-            Action act = () => this.service.BorrowBook(readerId, copyId);
+            Action act = () => this.service.BorrowBook(reader.Id, targetCopy.Id);
 
             // Assert
             if (shouldSucceed)
@@ -121,45 +102,25 @@ namespace Library.Tests.Services.Implementations
         public void BorrowBook_DailyLimit_ShouldBeIgnoredForLibrarian()
         {
             // Arrange
-            Guid readerId = Guid.NewGuid();
-            Guid copyId = Guid.NewGuid();
+            Reader reader = LibraryTestFactory.CreateReader(type: ReaderType.Librarian);
+            BookCopy targetCopy = LibraryTestFactory.CreateCopy();
 
-            BookCopy targetCopy = new BookCopy
-            {
-                Id = copyId,
-                IsAvailable = true,
-                BookEdition = new BookEdition
-                {
-                    Book = new Book { Title = "T" },
-                    BookType = "Hardcover",
-                    Publisher = "P",
-                },
-            };
-
-            // Limit is 1
-            this.mockConfig.Setup(c => c.MaxBooksPerDay).Returns(1);
-            this.mockConfig.Setup(c => c.MaxBooksPerReader).Returns(100);
-            this.mockConfig.Setup(c => c.MaxBooksPerDomain).Returns(100);
-            this.mockConfig.Setup(c => c.DomainCheckIntervalMonths).Returns(1);
+            this.mockConfig.SetupConfigDefaultLimits(maxBooksPerDay: 1);
 
             // History: Borrowed 5 books today (Way over limit)
             List<Loan> loans = new List<Loan>();
             for (int i = 0; i < 5; i++)
             {
-                loans.Add(new Loan { ReaderId = readerId, LoanDate = DateTime.Today });
+                loans.Add(LibraryTestFactory.CreateLoan(readerId: reader.Id, loanDate: DateTime.Today));
             }
 
-            this.mockReaderRepo.Setup(r => r.GetById(readerId)).Returns(new Reader { Type = ReaderType.Librarian, FirstName = "Jane", LastName = "Doe", Address = "123 Main St.", Email = "a@a.com" });
-            this.mockCopyRepo.Setup(c => c.GetById(copyId)).Returns(targetCopy);
-
-            this.mockCopyRepo.Setup(c => c.Find(It.IsAny<Expression<Func<BookCopy, bool>>>()))
-                .Returns(new List<BookCopy> { targetCopy });
-
-            this.mockLoanRepo.Setup(l => l.Find(It.IsAny<Expression<Func<Loan, bool>>>()))
-                .Returns(loans);
+            this.mockReaderRepo.SetupGetById(reader.Id, reader);
+            this.mockCopyRepo.SetupGetById(targetCopy.Id, targetCopy);
+            this.mockCopyRepo.SetupFind(new List<BookCopy> { targetCopy });
+            this.mockLoanRepo.SetupFind(loans);
 
             // Act
-            Action act = () => this.service.BorrowBook(readerId, copyId);
+            Action act = () => this.service.BorrowBook(reader.Id, targetCopy.Id);
 
             // Assert
             act.Should().NotThrow(); // Librarians ignore NCZ limit

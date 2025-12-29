@@ -10,6 +10,7 @@ namespace Library.Tests.Services.Implementations
     using Library.Domain.Entities;
     using Library.Domain.Repositories;
     using Library.Services.Implementations;
+    using Library.Tests.Helpers;
     using Microsoft.Extensions.Logging;
     using Moq;
 
@@ -46,13 +47,7 @@ namespace Library.Tests.Services.Implementations
         public void RegisterReader_ShouldCallRepository_WhenReaderIsValid()
         {
             // Arrange
-            Reader reader = new Reader
-            {
-                FirstName = "John",
-                LastName = "Doe",
-                Address = "123 Main St",
-                Email = "john@example.com",
-            };
+            Reader reader = LibraryTestFactory.CreateReader();
 
             this.mockValidator.Setup(v => v.Validate(reader))
                 .Returns(new ValidationResult());
@@ -61,8 +56,8 @@ namespace Library.Tests.Services.Implementations
             this.service.RegisterReader(reader);
 
             // Assert
-            this.mockRepository.Verify(r => r.Add(reader), Times.Once);
-            this.mockRepository.Verify(r => r.SaveChanges(), Times.Once);
+            this.mockRepository.VerifyAdd(Times.Once());
+            this.mockRepository.VerifySaved();
         }
 
         /// <summary>
@@ -93,7 +88,7 @@ namespace Library.Tests.Services.Implementations
 
             // Assert
             act.Should().Throw<ArgumentException>();
-            this.mockRepository.Verify(r => r.Add(It.IsAny<Reader>()), Times.Never);
+            this.mockRepository.VerifyAdd(Times.Never());
         }
     }
 }

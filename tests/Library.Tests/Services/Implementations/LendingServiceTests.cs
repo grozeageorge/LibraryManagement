@@ -10,6 +10,7 @@ namespace Library.Tests.Services.Implementations
     using Library.Domain.Interfaces;
     using Library.Domain.Repositories;
     using Library.Services.Implementations;
+    using Library.Tests.Helpers;
     using Microsoft.Extensions.Logging;
     using Moq;
 
@@ -72,14 +73,14 @@ namespace Library.Tests.Services.Implementations
         public void BorrowBook_ShouldThrow_WhenCopyNotFound()
         {
             // Arrange
-            Guid readerId = Guid.NewGuid();
+            Reader reader = LibraryTestFactory.CreateReader();
             Guid copyId = Guid.NewGuid();
 
-            this.mockReaderRepository.Setup(r => r.GetById(readerId)).Returns(new Reader { FirstName = "John", LastName = "Doe", Address = "123 Main St.", Email = "a@a.com" });
-            this.mockBookCopyRepository.Setup(c => c.GetById(copyId)).Returns((BookCopy?)null);
+            this.mockReaderRepository.SetupGetById(reader.Id, reader);
+            this.mockBookCopyRepository.SetupGetById(copyId, (BookCopy?)null);
 
             // Act
-            Action act = () => this.service.BorrowBook(readerId, copyId);
+            Action act = () => this.service.BorrowBook(reader.Id, copyId);
 
             // Assert
             act.Should().Throw<ArgumentException>().WithMessage("Book copy not found.");
@@ -92,15 +93,14 @@ namespace Library.Tests.Services.Implementations
         public void BorrowBook_shouldThrow_WhenBookHierarchyIncomplete()
         {
             // Arrange
-            Guid readerId = Guid.NewGuid();
-            Guid copyId = Guid.NewGuid();
-            BookCopy copy = new BookCopy { Id = copyId, BookEdition = null };
+            Reader reader = LibraryTestFactory.CreateReader();
+            BookCopy copy = LibraryTestFactory.CreateCopy(edition: null);
 
-            this.mockReaderRepository.Setup(r => r.GetById(readerId)).Returns(new Reader { FirstName = "John", LastName = "Doe", Address = "123 Main St.", Email = "a@a.com" });
-            this.mockBookCopyRepository.Setup(c => c.GetById(copyId)).Returns(copy);
+            this.mockReaderRepository.SetupGetById(reader.Id, reader);
+            this.mockBookCopyRepository.SetupGetById(copy.Id, copy);
 
             // Act
-            Action act = () => this.service.BorrowBook(readerId, copyId);
+            Action act = () => this.service.BorrowBook(reader.Id, copy.Id);
 
             // Assert
             act.Should().Throw<InvalidOperationException>();
@@ -113,18 +113,16 @@ namespace Library.Tests.Services.Implementations
         public void BorrowBook_ShouldThrow_WhenCopyNotAvailable()
         {
             // Arrange
-            Guid readerId = Guid.NewGuid();
-            Guid copyId = Guid.NewGuid();
+            Reader reader = LibraryTestFactory.CreateReader();
+            Book book = LibraryTestFactory.CreateBook();
+            BookEdition edition = LibraryTestFactory.CreateEdition(book: book);
+            BookCopy copy = LibraryTestFactory.CreateCopy(book: book, edition: edition, isAvailable: false);
 
-            Book book = new Book { Title = "Sample Book" };
-            BookEdition edition = new BookEdition { Book = book, Publisher = "P", BookType = "Hardcover" };
-            BookCopy copy = new BookCopy { Id = copyId, BookEdition = edition, IsAvailable = false };
-
-            this.mockReaderRepository.Setup(r => r.GetById(readerId)).Returns(new Reader { FirstName = "John", LastName = "Doe", Address = "123 Main St.", Email = "a@a.com" });
-            this.mockBookCopyRepository.Setup(c => c.GetById(copyId)).Returns(copy);
+            this.mockReaderRepository.SetupGetById(reader.Id, reader);
+            this.mockBookCopyRepository.SetupGetById(copy.Id, copy);
 
             // Act
-            Action act = () => this.service.BorrowBook(readerId, copyId);
+            Action act = () => this.service.BorrowBook(reader.Id, copy.Id);
 
             // Assert
             act.Should().Throw<InvalidOperationException>().WithMessage("*already borrowed*");
@@ -137,18 +135,16 @@ namespace Library.Tests.Services.Implementations
         public void BorrowBook_ShouldThrow_WhenCopyIsReadingRoomOnly()
         {
             // Arrange
-            Guid readerId = Guid.NewGuid();
-            Guid copyId = Guid.NewGuid();
+            Reader reader = LibraryTestFactory.CreateReader();
+            Book book = LibraryTestFactory.CreateBook();
+            BookEdition edition = LibraryTestFactory.CreateEdition(book: book);
+            BookCopy copy = LibraryTestFactory.CreateCopy(book: book, edition: edition, isAvailable: true, isReadingRoomOnly: true);
 
-            Book book = new Book { Title = "Sample Book" };
-            BookEdition edition = new BookEdition { Book = book, Publisher = "P", BookType = "Hardcover" };
-            BookCopy copy = new BookCopy { Id = copyId, BookEdition = edition, IsAvailable = true, IsReadingRoomOnly = true };
-
-            this.mockReaderRepository.Setup(r => r.GetById(readerId)).Returns(new Reader { FirstName = "John", LastName = "Doe", Address = "123 Main St.", Email = "a@a.com" });
-            this.mockBookCopyRepository.Setup(c => c.GetById(copyId)).Returns(copy);
+            this.mockReaderRepository.SetupGetById(reader.Id, reader);
+            this.mockBookCopyRepository.SetupGetById(copy.Id, copy);
 
             // Act
-            Action act = () => this.service.BorrowBook(readerId, copyId);
+            Action act = () => this.service.BorrowBook(reader.Id, copy.Id);
 
             // Assert
             act.Should().Throw<InvalidOperationException>().WithMessage("*reading room*");
@@ -161,27 +157,19 @@ namespace Library.Tests.Services.Implementations
         public void ReturnBook_ShouldUpdateReturnDate_WhenValid()
         {
             // Arrange
-            Guid loanId = Guid.NewGuid();
-            Guid copyId = Guid.NewGuid();
-            Loan loan = new Loan
-            {
-                Id = loanId,
-                BookCopyId = copyId,
-                ReturnDate = null,
-            };
+            BookCopy copy = LibraryTestFactory.CreateCopy(isAvailable: false);
+            Loan loan = LibraryTestFactory.CreateLoan(copy: copy, returnDate: null);
 
-            BookCopy copy = new BookCopy { Id = copyId, IsAvailable = false };
-
-            this.mockLoanRepository.Setup(l => l.GetById(loanId)).Returns(loan);
-            this.mockBookCopyRepository.Setup(c => c.GetById(copyId)).Returns(copy);
+            this.mockLoanRepository.SetupGetById(loan.Id, loan);
+            this.mockBookCopyRepository.SetupGetById(copy.Id, copy);
 
             // Act
-            this.service.ReturnBook(loanId);
+            this.service.ReturnBook(loan.Id);
 
             // Assert
             loan.ReturnDate.Should().NotBeNull();
             copy.IsAvailable.Should().BeTrue();
-            this.mockLoanRepository.Verify(r => r.SaveChanges(), Times.Once);
+            this.mockLoanRepository.VerifySaved();
         }
 
         /// <summary>
@@ -191,33 +179,28 @@ namespace Library.Tests.Services.Implementations
         public void BorrowBook_ShouldThrow_WhenStockIsBelow10Percent()
         {
             // Arrange
-            Guid readerId = Guid.NewGuid();
-            Guid copyId = Guid.NewGuid();
-            Guid bookId = Guid.NewGuid();
-
-            Book book = new Book { Id = bookId, Title = "Popular Book" };
-            BookEdition edition = new BookEdition { BookId = bookId, Book = book, Publisher = "P", BookType = "Hardcover" };
-
-            BookCopy targetCopy = new BookCopy { Id = copyId, BookEdition = edition, IsAvailable = true };
+            Reader reader = LibraryTestFactory.CreateReader();
+            Book book = LibraryTestFactory.CreateBook();
+            BookEdition edition = LibraryTestFactory.CreateEdition(book: book);
+            BookCopy targetCopy = LibraryTestFactory.CreateCopy(book: book, edition: edition, isAvailable: true);
 
             List<BookCopy> allCopies = new List<BookCopy>();
             for (int i = 0; i < 91; i++)
             {
-                allCopies.Add(new BookCopy { IsAvailable = false, BookEdition = edition });
+                allCopies.Add(LibraryTestFactory.CreateCopy(book: book, edition: edition, isAvailable: false));
             }
 
             for (int i = 0; i < 9; i++)
             {
-                allCopies.Add(new BookCopy { IsAvailable = true, BookEdition = edition });
+                allCopies.Add(LibraryTestFactory.CreateCopy(book: book, edition: edition, isAvailable: true));
             }
 
-            this.mockReaderRepository.Setup(r => r.GetById(readerId)).Returns(new Reader { FirstName = "John", LastName = "Doe", Address = "123 Main St.", Email = "a@a.com", Type = ReaderType.Standard });
-            this.mockBookCopyRepository.Setup(c => c.GetById(copyId)).Returns(targetCopy);
-            this.mockBookCopyRepository.Setup(c => c.Find(It.IsAny<Expression<Func<BookCopy, bool>>>()))
-                .Returns(allCopies);
+            this.mockReaderRepository.SetupGetById(reader.Id, reader);
+            this.mockBookCopyRepository.SetupGetById(targetCopy.Id, targetCopy);
+            this.mockBookCopyRepository.SetupFind(allCopies);
 
             // Act
-            Action act = () => this.service.BorrowBook(readerId, copyId);
+            Action act = () => this.service.BorrowBook(reader.Id, targetCopy.Id);
 
             // Assert
             act.Should().Throw<InvalidOperationException>().WithMessage("*stock is too low*");
@@ -230,39 +213,30 @@ namespace Library.Tests.Services.Implementations
         public void BorrowBook_ShouldPass_WhenStockIsExactly10Percent()
         {
             // Arrange
-            Guid readerId = Guid.NewGuid();
-            Guid copyId = Guid.NewGuid();
-            Guid bookId = Guid.NewGuid();
-
-            Book book = new Book { Id = bookId, Title = "Popular Book" };
-            BookEdition edition = new BookEdition { BookId = bookId, Book = book, Publisher = "P", BookType = "Hardcover" };
-            BookCopy targetCopy = new BookCopy { Id = copyId, BookEdition = edition, IsAvailable = true };
+            Reader reader = LibraryTestFactory.CreateReader();
+            Book book = LibraryTestFactory.CreateBook();
+            BookEdition edition = LibraryTestFactory.CreateEdition(book: book);
+            BookCopy targetCopy = LibraryTestFactory.CreateCopy(book: book, edition: edition, isAvailable: true);
 
             List<BookCopy> allCopies = new List<BookCopy>();
             for (int i = 0; i < 9; i++)
             {
-                allCopies.Add(new BookCopy { IsAvailable = false, BookEdition = edition });
+                allCopies.Add(LibraryTestFactory.CreateCopy(book: book, edition: edition, isAvailable: false));
             }
 
             allCopies.Add(targetCopy); // 1 available copy
 
-            this.mockReaderRepository.Setup(r => r.GetById(readerId)).Returns(new Reader { FirstName = "John", LastName = "Doe", Address = "123 Main St.", Email = "a@a.com", Type = ReaderType.Standard });
-            this.mockBookCopyRepository.Setup(c => c.GetById(copyId)).Returns(targetCopy);
-            this.mockBookCopyRepository.Setup(c => c.Find(It.IsAny<Expression<Func<BookCopy, bool>>>()))
-                .Returns(allCopies);
-
-            this.mockConfig.Setup(c => c.MaxBooksPerReader).Returns(5);
-            this.mockConfig.Setup(c => c.MaxBooksPerDay).Returns(2);
-            this.mockConfig.Setup(c => c.MaxBooksPerDomain).Returns(2);
-            this.mockConfig.Setup(c => c.DomainCheckIntervalMonths).Returns(3);
-            this.mockConfig.Setup(c => c.ReborrowRestrictedDays).Returns(90);
+            this.mockReaderRepository.SetupGetById(reader.Id, reader);
+            this.mockBookCopyRepository.SetupGetById(targetCopy.Id, targetCopy);
+            this.mockBookCopyRepository.SetupFind(allCopies);
+            this.mockConfig.SetupConfigDefaultLimits(maxBooksPerReader: 5, maxBooksPerDay: 2, maxBooksPerDomain: 2, domainCheckIntervalMonths: 3, reborrowRestrictedDays: 90);
 
             // Act
-            Action act = () => this.service.BorrowBook(readerId, copyId);
+            Action act = () => this.service.BorrowBook(reader.Id, targetCopy.Id);
 
             // Assert
             act.Should().NotThrow();
-            this.mockLoanRepository.Verify(r => r.Add(It.IsAny<Loan>()), Times.Once);
+            this.mockLoanRepository.VerifyAdd(Times.Once());
         }
 
         /// <summary>
@@ -272,34 +246,26 @@ namespace Library.Tests.Services.Implementations
         public void BorrowBook_ShouldThrow_WhenReaderReachedMaxBooksLimit()
         {
             // Arrange
-            Guid readerId = Guid.NewGuid();
-            Guid copyId = Guid.NewGuid();
-            Guid bookId = Guid.NewGuid();
+            Reader reader = LibraryTestFactory.CreateReader();
+            Book book = LibraryTestFactory.CreateBook();
+            BookEdition edition = LibraryTestFactory.CreateEdition(book: book);
+            BookCopy targetCopy = LibraryTestFactory.CreateCopy(book: book, edition: edition, isAvailable: true);
 
-            Book book = new Book { Id = bookId, Title = "Some Book" };
-            BookEdition edition = new BookEdition { BookId = bookId, Book = book, Publisher = "P", BookType = "Hardcover" };
-            BookCopy targetCopy = new BookCopy { Id = copyId, BookEdition = edition, IsAvailable = true };
+            this.mockConfig.SetupConfigDefaultLimits(maxBooksPerReader: 3);
 
-            this.mockConfig.Setup(c => c.MaxBooksPerReader).Returns(3);
-
-            List<Loan> existingLoans = new List<Loan>
+            List<Loan> existingLoans = new List<Loan>();
+            for (int i = 0; i < 3; i++)
             {
-                new Loan { ReaderId = readerId, ReturnDate = null },
-                new Loan { ReaderId = readerId, ReturnDate = null },
-                new Loan { ReaderId = readerId, ReturnDate = null },
-            };
+                existingLoans.Add(LibraryTestFactory.CreateLoan(readerId: reader.Id, returnDate: null));
+            }
 
-            this.mockReaderRepository.Setup(r => r.GetById(readerId)).Returns(new Reader { FirstName = "John", LastName = "Doe", Address = "123 Main St.", Email = "a@a.com", Type = ReaderType.Standard });
-            this.mockBookCopyRepository.Setup(c => c.GetById(copyId)).Returns(targetCopy);
-
-            this.mockBookCopyRepository.Setup(c => c.Find(It.IsAny<Expression<Func<BookCopy, bool>>>()))
-                .Returns(new List<BookCopy> { targetCopy });
-
-            this.mockLoanRepository.Setup(l => l.Find(It.IsAny<Expression<Func<Loan, bool>>>()))
-                .Returns(existingLoans);
+            this.mockReaderRepository.SetupGetById(reader.Id, reader);
+            this.mockBookCopyRepository.SetupGetById(targetCopy.Id, targetCopy);
+            this.mockBookCopyRepository.SetupFind(new List<BookCopy> { targetCopy });
+            this.mockLoanRepository.SetupFind(existingLoans);
 
             // Act
-            Action act = () => this.service.BorrowBook(readerId, copyId);
+            Action act = () => this.service.BorrowBook(reader.Id, targetCopy.Id);
 
             // Assert
             act.Should().Throw<InvalidOperationException>().WithMessage("*maximum number of borrowed books*");
@@ -312,40 +278,29 @@ namespace Library.Tests.Services.Implementations
         public void BorrowBook_ShouldPass_WhenLibrarianExceedsStandardLimit()
         {
             // Arrange
-            Guid readerId = Guid.NewGuid();
-            Guid copyId = Guid.NewGuid();
-            Guid bookId = Guid.NewGuid();
+            Reader reader = LibraryTestFactory.CreateReader(type: ReaderType.Librarian);
+            BookCopy targetCopy = LibraryTestFactory.CreateCopy();
 
-            Book book = new Book { Id = bookId, Title = "Some Book" };
-            BookEdition edition = new BookEdition { BookId = bookId, Book = book, Publisher = "P", BookType = "Hardcover" };
-            BookCopy targetCopy = new BookCopy { Id = copyId, BookEdition = edition, IsAvailable = true };
+            this.mockConfig.SetupConfigDefaultLimits(maxBooksPerReader: 3);
 
-            this.mockConfig.Setup(c => c.MaxBooksPerReader).Returns(3);
-            this.mockConfig.Setup(c => c.MaxBooksPerDomain).Returns(2);
-            this.mockConfig.Setup(c => c.DomainCheckIntervalMonths).Returns(3);
-            this.mockConfig.Setup(c => c.ReborrowRestrictedDays).Returns(90);
-
-            List<Loan> existingLoans = new List<Loan>
+            List<Loan> existingLoans = new List<Loan>();
+            for (int i = 0; i < 4; i++)
             {
-                new Loan { ReaderId = readerId, ReturnDate = null },
-                new Loan { ReaderId = readerId, ReturnDate = null },
-                new Loan { ReaderId = readerId, ReturnDate = null },
-                new Loan { ReaderId = readerId, ReturnDate = null },
-            };
+                existingLoans.Add(LibraryTestFactory.CreateLoan(readerId: reader.Id));
+            }
 
-            this.mockReaderRepository.Setup(r => r.GetById(readerId)).Returns(new Reader { FirstName = "Jane", LastName = "Smith", Address = "456 Elm St.", Email = "a@a.com", Type = ReaderType.Librarian });
-            this.mockBookCopyRepository.Setup(c => c.GetById(copyId)).Returns(targetCopy);
-            this.mockBookCopyRepository.Setup(c => c.Find(It.IsAny<Expression<Func<BookCopy, bool>>>()))
-                .Returns(new List<BookCopy> { targetCopy });
-            this.mockLoanRepository.Setup(l => l.Find(It.IsAny<Expression<Func<Loan, bool>>>()))
-                .Returns(existingLoans);
+            this.mockReaderRepository.SetupGetById(reader.Id, reader);
+            this.mockBookCopyRepository.SetupGetById(targetCopy.Id, targetCopy);
+            this.mockBookCopyRepository.SetupFind(new List<BookCopy> { targetCopy });
+            this.mockLoanRepository.SetupFind(existingLoans);
 
             // Act
-            Action act = () => this.service.BorrowBook(readerId, copyId);
+            Action act = () => this.service.BorrowBook(reader.Id, targetCopy.Id);
 
             // Assert
             act.Should().NotThrow();
-            this.mockLoanRepository.Verify(r => r.Add(It.IsAny<Loan>()), Times.Once);
+            this.mockLoanRepository.VerifyAdd(Times.Once());
+            this.mockLoanRepository.VerifySaved();
         }
 
         /// <summary>
@@ -355,34 +310,26 @@ namespace Library.Tests.Services.Implementations
         public void BorrowBook_ShouldThrow_WhenDailyLimitReached()
         {
             // Arrange
-            Guid readerId = Guid.NewGuid();
-            Guid copyId = Guid.NewGuid();
-            Guid bookId = Guid.NewGuid();
+            Reader reader = LibraryTestFactory.CreateReader();
+            Book book = LibraryTestFactory.CreateBook();
+            BookEdition edition = LibraryTestFactory.CreateEdition(book: book);
+            BookCopy targetCopy = LibraryTestFactory.CreateCopy(book: book, edition: edition, isAvailable: true);
 
-            Book book = new Book { Id = bookId, Title = "Some Book" };
-            BookEdition edition = new BookEdition { BookId = bookId, Book = book, Publisher = "P", BookType = "Hardcover" };
-            BookCopy targetCopy = new BookCopy { Id = copyId, BookEdition = edition, IsAvailable = true };
+            this.mockConfig.SetupConfigDefaultLimits(maxBooksPerReader: 10, maxBooksPerDay: 2);
 
-            this.mockConfig.Setup(c => c.MaxBooksPerReader).Returns(10);
-            this.mockConfig.Setup(c => c.MaxBooksPerDay).Returns(2);
-
-            List<Loan> existingLoans = new List<Loan>
+            List<Loan> existingLoans = new List<Loan>();
+            for (int i = 0; i < 2; i++)
             {
-                new Loan { ReaderId = readerId, LoanDate = DateTime.Today },
-                new Loan { ReaderId = readerId, LoanDate = DateTime.Today },
-            };
+                existingLoans.Add(LibraryTestFactory.CreateLoan(readerId: reader.Id, loanDate: DateTime.Today));
+            }
 
-            this.mockReaderRepository.Setup(r => r.GetById(readerId)).Returns(new Reader { FirstName = "John", LastName = "Doe", Address = "123 Main St.", Email = "a@a.com", Type = ReaderType.Standard });
-            this.mockBookCopyRepository.Setup(c => c.GetById(copyId)).Returns(targetCopy);
-
-            this.mockBookCopyRepository.Setup(c => c.Find(It.IsAny<Expression<Func<BookCopy, bool>>>()))
-                .Returns(new List<BookCopy> { targetCopy });
-
-            this.mockLoanRepository.Setup(l => l.Find(It.IsAny<Expression<Func<Loan, bool>>>()))
-                .Returns(existingLoans);
+            this.mockReaderRepository.SetupGetById(reader.Id, reader);
+            this.mockBookCopyRepository.SetupGetById(targetCopy.Id, targetCopy);
+            this.mockBookCopyRepository.SetupFind(new List<BookCopy> { targetCopy });
+            this.mockLoanRepository.SetupFind(existingLoans);
 
             // Act
-            Action act = () => this.service.BorrowBook(readerId, copyId);
+            Action act = () => this.service.BorrowBook(reader.Id, targetCopy.Id);
 
             // Assert
             act.Should().Throw<InvalidOperationException>().WithMessage("*daily borrowing limit*");
@@ -395,35 +342,26 @@ namespace Library.Tests.Services.Implementations
         public void BorrowBook_ShouldThrow_WhenReborrowingTooSoon()
         {
             // Arrange
-            Guid readerId = Guid.NewGuid();
-            Guid copyId = Guid.NewGuid();
-            Guid bookId = Guid.NewGuid();
+            Reader reader = LibraryTestFactory.CreateReader();
+            Book book = LibraryTestFactory.CreateBook();
+            BookEdition edition = LibraryTestFactory.CreateEdition(book: book);
+            BookCopy targetCopy = LibraryTestFactory.CreateCopy(book: book, edition: edition, isAvailable: true);
 
-            Book book = new Book { Id = bookId, Title = "Some Book" };
-            BookEdition edition = new BookEdition { BookId = bookId, Book = book, Publisher = "P", BookType = "Hardcover" };
-            BookCopy targetCopy = new BookCopy { Id = copyId, BookEdition = edition, IsAvailable = true };
+            this.mockConfig.SetupConfigDefaultLimits(maxBooksPerReader: 5, reborrowRestrictedDays: 90);
 
-            this.mockConfig.Setup(c => c.MaxBooksPerReader).Returns(5);
-            this.mockConfig.Setup(c => c.ReborrowRestrictedDays).Returns(90);
+            Loan lastLoan = LibraryTestFactory.CreateLoan(
+                readerId: reader.Id,
+                copy: LibraryTestFactory.CreateCopy(),
+                loanDate: DateTime.Now.AddDays(-10),
+                returnDate: DateTime.Now.AddDays(-5));
 
-            Loan lastLoan = new Loan
-            {
-                ReaderId = readerId,
-                LoanDate = DateTime.Now.AddDays(-10),
-                ReturnDate = DateTime.Now.AddDays(-5),
-                BookCopy = new BookCopy { BookEdition = edition },
-            };
-
-            this.mockReaderRepository.Setup(r => r.GetById(readerId)).Returns(new Reader { FirstName = "John", LastName = "Doe", Address = "123 Main St.", Email = "a@a.com", Type = ReaderType.Standard });
-            this.mockBookCopyRepository.Setup(c => c.GetById(copyId)).Returns(targetCopy);
-
-            this.mockBookCopyRepository.Setup(c => c.Find(It.IsAny<Expression<Func<BookCopy, bool>>>()))
-                .Returns(new List<BookCopy> { targetCopy });
-            this.mockLoanRepository.Setup(l => l.Find(It.IsAny<Expression<Func<Loan, bool>>>()))
-                .Returns(new List<Loan> { lastLoan });
+            this.mockReaderRepository.SetupGetById(reader.Id, reader);
+            this.mockBookCopyRepository.SetupGetById(targetCopy.Id, targetCopy);
+            this.mockBookCopyRepository.SetupFind(new List<BookCopy> { targetCopy });
+            this.mockLoanRepository.SetupFind(new List<Loan> { lastLoan });
 
             // Act
-            Action act = () => this.service.BorrowBook(readerId, copyId);
+            Action act = () => this.service.BorrowBook(reader.Id, targetCopy.Id);
 
             // Assert
             act.Should().Throw<InvalidOperationException>();

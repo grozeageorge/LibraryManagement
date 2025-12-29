@@ -11,6 +11,7 @@ namespace Library.Tests.Services.Implementations
     using Library.Domain.Interfaces;
     using Library.Domain.Repositories;
     using Library.Services.Implementations;
+    using Library.Tests.Helpers;
     using Microsoft.Extensions.Logging;
     using Moq;
 
@@ -50,19 +51,19 @@ namespace Library.Tests.Services.Implementations
         public void AddBook_ShouldCallRepository_WhenBookIsValid()
         {
             // Arrange
-            Book book = new Book { Title = "Test Book" };
+            Book book = LibraryTestFactory.CreateBook("Test book");
 
             this.mockValidator.Setup(v => v.Validate(book))
                 .Returns(new ValidationResult());
-            this.mockConfig.Setup(c => c.MaxDomainsPerBook)
-                .Returns(3);
+
+            this.mockConfig.SetupConfigDefaultLimits(maxBooksPerReader: 3);
 
             // Act
             this.service.AddBook(book);
 
             // Assert
-            this.mockRepository.Verify(r => r.Add(book), Times.Once);
-            this.mockRepository.Verify(r => r.SaveChanges(), Times.Once);
+            this.mockRepository.VerifyAdd(Times.Once());
+            this.mockRepository.VerifySaved();
         }
 
         /// <summary>
@@ -72,7 +73,7 @@ namespace Library.Tests.Services.Implementations
         public void AddBook_ShouldThrowArgumentException_WhenValidationFails()
         {
             // Arrange
-            Book book = new Book { Title = string.Empty };
+            Book book = LibraryTestFactory.CreateBook(string.Empty);
             ValidationResult failure = new ValidationResult(new[] { new ValidationFailure("Title", "Required") });
 
             this.mockValidator.Setup(v => v.Validate(book)).Returns(failure);
@@ -82,7 +83,7 @@ namespace Library.Tests.Services.Implementations
 
             // Assert
             act.Should().Throw<ArgumentException>().WithMessage("*Required*");
-            this.mockRepository.Verify(r => r.Add(It.IsAny<Book>()), Times.Never);
+            this.mockRepository.VerifyAdd(Times.Never());
         }
 
         /// <summary>
@@ -100,7 +101,7 @@ namespace Library.Tests.Services.Implementations
             book.Domains.Add(new BookDomain { Name = "D4" });
 
             this.mockValidator.Setup(v => v.Validate(book)).Returns(new ValidationResult());
-            this.mockConfig.Setup(c => c.MaxDomainsPerBook).Returns(3);
+            this.mockConfig.SetupConfigDefaultLimits(maxDomainsPerBook: 3);
 
             // Act
             Action act = () => this.service.AddBook(book);
@@ -119,7 +120,7 @@ namespace Library.Tests.Services.Implementations
             Guid id = Guid.NewGuid();
             Book book = new Book { Id = id, Title = "Book" };
 
-            this.mockRepository.Setup(r => r.GetById(id)).Returns(book);
+            this.mockRepository.SetupGetById(id, book);
 
             // Act
             Book? result = this.service.GetBookById(id);
