@@ -136,6 +136,10 @@ namespace Library.Data
                 .WithMany(r => r.ProcessedLoans)
                 .HasForeignKey(l => l.LibrarianId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<BookCopy>()
+                .Property(c => c.RowVersion)
+                .IsRowVersion();
         }
     }
 }

@@ -41,5 +41,13 @@ namespace Library.Domain.Entities
         ///   <c>true</c> if this instance is available; otherwise, <c>false</c>.
         /// </value>
         public bool IsAvailable { get; set; } = true;
+
+        /// <summary>
+        /// Gets or sets the row version which is a concurrency token. Automatically updated by the database on every modification. Optimistic concurrency.
+        /// </summary>
+        /// <value>
+        /// The row version.
+        /// </value>
+        public byte[]? RowVersion { get; set; }
     }
 }

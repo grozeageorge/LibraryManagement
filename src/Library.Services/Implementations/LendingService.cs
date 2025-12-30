@@ -8,6 +8,7 @@ namespace Library.Services.Implementations
     using Library.Domain.Interfaces;
     using Library.Domain.Repositories;
     using Library.Services.Interfaces;
+    using Microsoft.EntityFrameworkCore;
     using Microsoft.Extensions.Logging;
 
     /// <summary>
@@ -119,6 +120,11 @@ namespace Library.Services.Implementations
                 this.loanRepository.Add(loan);
                 this.loanRepository.SaveChanges();
                 this.logger.LogInformation("Book borrowed successfully.");
+            }
+            catch (DbUpdateConcurrencyException ex)
+            {
+                this.logger.LogError(ex, $"Concurrency conflict occurred while borrowing the book copy: {bookCopyId}.");
+                throw new InvalidOperationException("Transaction failed: This book was just taken by another user. Please refresh and try again.");
             }
             catch (Exception ex)
             {
