@@ -14,7 +14,7 @@ namespace Library.Tests.Services.Implementations
     using Moq;
 
     /// <summary>
-    /// Tests in the lending service mainly for checking boundaries and failures for the extend loan method.
+    /// Tests in the lending service mainly for checking boundaries (LIM) and failures for the extend loan method.
     /// </summary>
     [TestFixture]
     public class LendingServiceExtensionTests

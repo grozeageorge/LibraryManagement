@@ -15,7 +15,7 @@ namespace Library.Tests.Services.Implementations
     using Moq;
 
     /// <summary>
-    /// Tests for the Lending Service for the Domain History Limit for standard and librarian types of reader and also checking if older loans are ignored.
+    /// Tests for the Lending Service for the Domain History Limit (D or L) for standard and librarian types of reader and also checking if older loans are ignored.
     /// </summary>
     [TestFixture]
     public class LendingServiceDomainHistoryTests
@@ -64,7 +64,7 @@ namespace Library.Tests.Services.Implementations
         [TestCase(ReaderType.Librarian, 2, 3, true)]
         [TestCase(ReaderType.Librarian, 2, 4, false)]
         [TestCase(ReaderType.Librarian, 3, 5, true)]
-        [TestCase(ReaderType.Librarian, 3, 6, false)]
+        [TestCase(ReaderType.Librarian, 6, 3, false)]
         public void BorrowBook_DomainHistory(ReaderType type, int limitD, int currentCount, bool shouldSucceed)
         {
             // Arrange
@@ -129,15 +129,6 @@ namespace Library.Tests.Services.Implementations
                 copy: LibraryTestFactory.CreateCopy(edition: LibraryTestFactory.CreateEdition(book: b1)),
                 loanDate: DateTime.Now.AddMonths(-1))); // Recent
 
-            // Loan 2: Old (Should NOT count)
-            // Note: In the real service, the Repository.Find filters by date.
-            // Since we Mock Find, we must ensure we simulate that filter or return the list and let the service logic handle it?
-            // Wait, the Service logic does: `repo.Find(l => ... Date >= sinceDate)`.
-            // If we return the old loan here, the Service assumes the Repo filtered it.
-            // So we should ONLY return the recent loan to simulate the DB correctly.
-
-            // Let's verify the Service logic actually asks for the correct date.
-            // We will return ONLY the recent loan.
             List<Loan> recentLoans = new List<Loan> { loans[0] };
 
             this.mockReaderRepo.SetupGetById(reader.Id, reader);

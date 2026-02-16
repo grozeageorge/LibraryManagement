@@ -65,7 +65,7 @@ namespace Library.Domain.Entities
                 return false;
             }
 
-            var current = domain.ParentDomain;
+            BookDomain? current = domain.ParentDomain;
             while (current != null)
             {
                 if (current.Id == this.Id)

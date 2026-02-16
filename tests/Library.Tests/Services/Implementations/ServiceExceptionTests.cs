@@ -23,7 +23,6 @@ namespace Library.Tests.Services.Implementations
     [TestFixture]
     public class ServiceExceptionTests
     {
-        // --- Mocks ---
         private Mock<IRepository<Book>> mockBookRepo;
         private Mock<IRepository<Reader>> mockReaderRepo;
         private Mock<IRepository<Loan>> mockLoanRepo;
@@ -68,7 +67,6 @@ namespace Library.Tests.Services.Implementations
             this.mockBookValidator.Setup(v => v.Validate(book)).Returns(new FluentValidation.Results.ValidationResult());
             this.mockConfig.SetupConfigDefaultLimits();
 
-            // FORCE DATABASE ERROR
             this.mockBookRepo.Setup(r => r.SaveChanges()).Throws(new Exception("Database Connection Failed"));
 
             // Act
@@ -77,7 +75,6 @@ namespace Library.Tests.Services.Implementations
             // Assert
             act.Should().Throw<Exception>().WithMessage("Database Connection Failed");
 
-            // Verify Logger was called (This covers the catch block!)
         }
 
         /// <summary>
@@ -100,12 +97,10 @@ namespace Library.Tests.Services.Implementations
             Reader reader = LibraryTestFactory.CreateReader();
             BookCopy copy = LibraryTestFactory.CreateCopy();
 
-            // Setup valid state
             this.mockReaderRepo.SetupGetById(reader.Id, reader);
             this.mockCopyRepo.SetupGetById(copy.Id, copy);
             this.mockCopyRepo.SetupFind(new[] { copy }); // Stock check
 
-            // FORCE DATABASE ERROR on Save
             this.mockLoanRepo.Setup(r => r.SaveChanges()).Throws(new Exception("Critical DB Error"));
 
             // Act
@@ -122,26 +117,21 @@ namespace Library.Tests.Services.Implementations
         public void ReaderService_RegisterReader_ShouldLogAndThrow_WhenDatabaseFails()
         {
             // Arrange
-            var service = new ReaderService(
+            ReaderService service = new ReaderService(
                 this.mockReaderRepo.Object,
                 new Mock<ILogger<ReaderService>>().Object, // Create a specific logger mock for ReaderService
                 new Mock<FluentValidation.IValidator<Reader>>().Object); // Create a dummy validator
 
             var reader = LibraryTestFactory.CreateReader();
 
-            // Setup Validator to pass (using a loose mock for simplicity here)
-            // Or if you want to use the field mock:
-            // We need to instantiate the service with the class-level mocks if we want to control them.
-            // Let's re-instantiate properly using the class fields to be safe.
             var mockReaderValidator = new Mock<FluentValidation.IValidator<Reader>>();
             mockReaderValidator.Setup(v => v.Validate(reader)).Returns(new FluentValidation.Results.ValidationResult());
 
-            var readerService = new ReaderService(
+            ReaderService readerService = new ReaderService(
                 this.mockReaderRepo.Object,
                 new Mock<ILogger<ReaderService>>().Object,
                 mockReaderValidator.Object);
 
-            // FORCE DATABASE ERROR
             this.mockReaderRepo.Setup(r => r.SaveChanges()).Throws(new Exception("Reader DB Error"));
 
             // Act
@@ -171,12 +161,10 @@ namespace Library.Tests.Services.Implementations
             Reader reader = LibraryTestFactory.CreateReader();
             BookCopy copy = LibraryTestFactory.CreateCopy();
 
-            // Setup valid state
             this.mockReaderRepo.SetupGetById(reader.Id, reader);
             this.mockCopyRepo.SetupGetById(copy.Id, copy);
             this.mockCopyRepo.SetupFind(new[] { copy }); // Stock check
 
-            // FORCE CONCURRENCY ERROR on Save
             this.mockLoanRepo.Setup(r => r.SaveChanges())
                 .Throws(new DbUpdateConcurrencyException("RowVersion mismatch", new List<IUpdateEntry>()));
 

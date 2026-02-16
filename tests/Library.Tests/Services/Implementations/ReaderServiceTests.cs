@@ -75,7 +75,7 @@ namespace Library.Tests.Services.Implementations
                 Email = "a@a.com",
             };
 
-            var failure = new ValidationResult(new[]
+            ValidationResult failure = new ValidationResult(new[]
             {
                 new ValidationFailure("FirstName", "First name is required."),
             });

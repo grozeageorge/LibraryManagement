@@ -22,7 +22,7 @@ namespace Library.ConsoleApp
         /// <returns>A configured instance of <see cref="LibraryDbContext"/>.</returns>
         public LibraryDbContext CreateDbContext(string[] args)
         {
-            var optionsBuilder = new DbContextOptionsBuilder<LibraryDbContext>();
+            DbContextOptionsBuilder<LibraryDbContext> optionsBuilder = new DbContextOptionsBuilder<LibraryDbContext>();
 
             optionsBuilder.UseSqlServer("Data Source=localhost\\SQLEXPRESS;Initial Catalog=LibraryDb;Integrated Security=True;TrustServerCertificate=True;");
 

@@ -48,6 +48,6 @@ namespace Library.Domain.Entities
         /// <value>
         /// The row version.
         /// </value>
-        public byte[]? RowVersion { get; set; }
+        public byte[] RowVersion { get; set; }
     }
 }

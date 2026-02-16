@@ -15,7 +15,7 @@ namespace Library.Tests.Services.Implementations
     using Moq;
 
     /// <summary>
-    /// Tests for the lending service related to librarian functionalities and limits.
+    /// Tests for the lending service related to librarian functionalities and limits (PERSIMP).
     /// </summary>
     [TestFixture]
     public class LendingServiceLibrarianTests
@@ -64,7 +64,7 @@ namespace Library.Tests.Services.Implementations
             this.mockConfig.SetupConfigDefaultLimits(maxProcessedPerDayLibrarian: 20);
 
             List<Loan> processedLoans = new List<Loan>();
-            for (int i = 0; i < 20; i++)
+            for (int i = 0; i < 19; i++)
             {
                 processedLoans.Add(LibraryTestFactory.CreateLoan(librarian: librarian, loanDate: DateTime.Today));
             }

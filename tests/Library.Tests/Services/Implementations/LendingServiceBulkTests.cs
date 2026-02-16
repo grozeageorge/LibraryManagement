@@ -15,7 +15,7 @@ namespace Library.Tests.Services.Implementations
     using Moq;
 
     /// <summary>
-    /// Tests regarding limits and correct functionality of borrowing a bulk of books from the library.
+    /// Tests regarding limits (C) and correct functionality of borrowing a bulk of books from the library.
     /// </summary>
     [TestFixture]
     public class LendingServiceBulkTests

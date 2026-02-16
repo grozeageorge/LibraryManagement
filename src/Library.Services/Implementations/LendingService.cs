@@ -196,9 +196,6 @@ namespace Library.Services.Implementations
             }
 
             // Load Reader to check if librarian
-            // If lazy loading is off, we might need to fetch reader explicitly.
-            // We assume generic repo getbyid doesn't include navigation properties by default unless configured.
-            // Fetching the reader to be safe.
             Reader? reader = this.readerRepository.GetById(loan.ReaderId);
             if (reader == null)
             {
@@ -281,7 +278,6 @@ namespace Library.Services.Implementations
                     // Ensure hierarchy is loaded
                     if (copy.BookEdition?.Book == null)
                     {
-                        // Try to load book if missing (simplified in real app use .Include()
                         throw new InvalidOperationException("Book data incomplete.");
                     }
 

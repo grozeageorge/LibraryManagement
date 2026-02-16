@@ -107,7 +107,6 @@ namespace Library.Tests.Services.Implementations
 
             this.mockConfig.SetupConfigDefaultLimits(maxBooksPerDay: 1);
 
-            // History: Borrowed 5 books today (Way over limit)
             List<Loan> loans = new List<Loan>();
             for (int i = 0; i < 5; i++)
             {

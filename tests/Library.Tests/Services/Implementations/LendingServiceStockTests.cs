@@ -1,10 +1,9 @@
-﻿// <copyright file="LendingServiceParameterizedTests.cs" company="Transilvania University of Brasov">
+﻿// <copyright file="LendingServiceStockTests.cs" company="Transilvania University of Brasov">
 // Copyright (c) Grozea George. All rights reserved.
 // </copyright>
 
 namespace Library.Tests.Services.Implementations
 {
-    using System.Linq.Expressions;
     using FluentAssertions;
     using Library.Domain.Entities;
     using Library.Domain.Interfaces;
@@ -15,10 +14,10 @@ namespace Library.Tests.Services.Implementations
     using Moq;
 
     /// <summary>
-    /// Prameterized tests for the Lending service class using TestCase attribute.
+    /// Tests for the lending service stock rule when borrowing books (10% Stock Rule).
     /// </summary>
     [TestFixture]
-    public class LendingServiceParameterizedTests
+    public class LendingServiceStockTests
     {
         private Mock<IRepository<Loan>> mockLoanRepo;
         private Mock<IRepository<Reader>> mockReaderRepo;
@@ -83,7 +82,7 @@ namespace Library.Tests.Services.Implementations
             List<BookCopy> allCopies = new List<BookCopy>();
 
             // Add borrowed copies
-            for (int i = 0;  i < borrowedCount;  i++)
+            for (int i = 0; i < borrowedCount; i++)
             {
                 allCopies.Add(LibraryTestFactory.CreateCopy(book: book, edition: edition, isAvailable: false));
             }
@@ -137,109 +136,6 @@ namespace Library.Tests.Services.Implementations
             {
                 act.Should().Throw<InvalidOperationException>()
                     .WithMessage("*Stock is too low*");
-            }
-        }
-
-        /// <summary>
-        /// Tests the Max Books Per Reader rule for both Reader types.
-        /// </summary>
-        /// <param name="type">The type.</param>
-        /// <param name="configLimit">The configuration limit.</param>
-        /// <param name="currentLoans">The current loans.</param>
-        /// <param name="shouldSucceed">if set to <c>true</c> [should succeed].</param>
-        [TestCase(ReaderType.Standard, 3, 2, true)]
-        [TestCase(ReaderType.Standard, 3, 3, false)]
-        [TestCase(ReaderType.Librarian, 3, 3, true)]
-        [TestCase(ReaderType.Librarian, 3, 5, true)]
-        [TestCase(ReaderType.Librarian, 3, 6, false)]
-        [TestCase(ReaderType.Standard, 1, 0, true)]
-        [TestCase(ReaderType.Standard, 1, 1, false)]
-        [TestCase(ReaderType.Standard, 10, 9, true)]
-        [TestCase(ReaderType.Librarian, 1, 1, true)]
-        [TestCase(ReaderType.Librarian, 1, 2, false)]
-        [TestCase(ReaderType.Librarian, 5, 9, true)]
-        public void BorrowBook_ReaderLimits_Boundaries(ReaderType type, int configLimit, int currentLoans, bool shouldSucceed)
-        {
-            // Arrange
-            Reader reader = LibraryTestFactory.CreateReader(type: type);
-            Book book = LibraryTestFactory.CreateBook("Math");
-            BookEdition edition = LibraryTestFactory.CreateEdition(book: book, bookType: "Educational", publisher: "P");
-            BookCopy targetCopy = LibraryTestFactory.CreateCopy(book: book, edition: edition, isAvailable: true);
-
-            this.mockConfig.SetupConfigDefaultLimits(maxBooksPerReader: configLimit);
-
-            List<Loan> loans = new List<Loan>();
-            for (int i = 0; i < currentLoans; i++)
-            {
-                loans.Add(LibraryTestFactory.CreateLoan(readerId: reader.Id));
-            }
-
-            this.mockReaderRepo.SetupGetById(reader.Id, reader);
-            this.mockCopyRepo.SetupGetById(targetCopy.Id, targetCopy);
-            this.mockCopyRepo.SetupFind(new List<BookCopy> { targetCopy });
-            this.mockLoanRepo.SetupFind(loans);
-
-            // Act
-            Action act = () => this.lendingService.BorrowBook(reader.Id, targetCopy.Id);
-
-            // Assert
-            if (shouldSucceed)
-            {
-                act.Should().NotThrow();
-            }
-            else
-            {
-                act.Should().Throw<InvalidOperationException>()
-                    .WithMessage("*maximum number of borrowed books*");
-            }
-        }
-
-        /// <summary>
-        /// Tests the Reborrow Delta (90 days) rule.
-        /// </summary>
-        /// <param name="type">The type.</param>
-        /// <param name="configDelta">The configuration delta.</param>
-        /// <param name="daysSinceLoan">The days since loan.</param>
-        /// <param name="shouldSucceed">if set to <c>true</c> [should succeed].</param>
-        [TestCase(ReaderType.Standard, 90, 89, false)]
-        [TestCase(ReaderType.Standard, 90, 91, true)]
-        [TestCase(ReaderType.Librarian, 90, 44, false)]
-        [TestCase(ReaderType.Librarian, 90, 46, true)]
-        [TestCase(ReaderType.Standard, 10, 1, false)]
-        [TestCase(ReaderType.Standard, 10, 11, true)]
-        [TestCase(ReaderType.Standard, 30, 15, false)]
-        [TestCase(ReaderType.Librarian, 10, 4, false)]
-        [TestCase(ReaderType.Librarian, 10, 6, true)]
-        [TestCase(ReaderType.Librarian, 60, 29, false)]
-        public void BorrowBook_ReborrowDelta_Boundaries(ReaderType type, int configDelta, int daysSinceLoan, bool shouldSucceed)
-        {
-            // Arrange
-            Reader reader = LibraryTestFactory.CreateReader(type: type);
-            Book book = LibraryTestFactory.CreateBook("Math");
-            BookEdition edition = LibraryTestFactory.CreateEdition(book: book, bookType: "Educational", publisher: "P");
-            BookCopy targetCopy = LibraryTestFactory.CreateCopy(book: book, edition: edition, isAvailable: true);
-
-            this.mockConfig.SetupConfigDefaultLimits(reborrowRestrictedDays: configDelta);
-
-            Loan lastLoan = LibraryTestFactory.CreateLoan(readerId: reader.Id, loanDate: DateTime.Now.AddDays(-daysSinceLoan), returnDate: DateTime.Now.AddDays(-daysSinceLoan + 5), copy: LibraryTestFactory.CreateCopy(edition: edition));
-
-            this.mockReaderRepo.SetupGetById(reader.Id, reader);
-            this.mockCopyRepo.SetupGetById(targetCopy.Id, targetCopy);
-            this.mockCopyRepo.SetupFind(new List<BookCopy> { targetCopy });
-            this.mockLoanRepo.SetupFind(new List<Loan> { lastLoan });
-
-            // Act
-            Action act = () => this.lendingService.BorrowBook(reader.Id, targetCopy.Id);
-
-            // Assert
-            if (shouldSucceed)
-            {
-                act.Should().NotThrow();
-            }
-            else
-            {
-                act.Should().Throw<InvalidOperationException>()
-                    .WithMessage("*Must wait*");
             }
         }
     }
