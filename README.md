@@ -2,7 +2,7 @@
 
 ![.NET](https://img.shields.io/badge/.NET-10.0-512bd4?style=flat&logo=dotnet)
 ![Language](https://img.shields.io/badge/Language-C%23-blue)
-![Architecture](https://img.shields.io/badge/Architecture-Clean%20Architecture-green)
+![Architecture](https://img.shields.io/badge/Clean%20Architecture-green)
 ![Tests](https://img.shields.io/badge/Tests-200%2B-success)
 ![Coverage](https://img.shields.io/badge/Coverage-95%25-brightgreen)
 
